@@ -49,7 +49,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - run: npm ci
       - run: npm run android:sync
       - name: Preparar firma de publicación
@@ -102,6 +102,3 @@ jobs:
         with:
           files: release-assets/*
           generate_release_notes: true
-
-
-
