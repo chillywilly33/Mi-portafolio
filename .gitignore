@@ -8,3 +8,9 @@ src/js/config.local.js
 datos.json
 datos.bak.json
 mis-inversiones-respaldo-*.json
+android/.gradle/
+android/local.properties
+android/**/build/
+android/app/release.keystore
+.cache/
+

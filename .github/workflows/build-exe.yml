@@ -1,4 +1,4 @@
-name: Construir .exe
+name: Construir y publicar aplicaciones
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # necesario para adjuntar el .exe a la Release
+  contents: write
 
 jobs:
   probar:
@@ -17,25 +17,91 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: node tests/calc.test.js
+      - name: Validar versión de la etiqueta
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node -e "const p=require('./package.json').version; const t=process.env.GITHUB_REF_NAME.replace(/^v/, ''); if(p!==t) throw new Error('package.json version '+p+' debe coincidir con la etiqueta '+t)"
 
-  exe:
+  windows:
     needs: probar
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
-      - run: npm install
+      - run: npm ci
       - run: npm run dist
       - uses: actions/upload-artifact@v4
         with:
-          name: Mis-Inversiones-exe
+          name: windows-release
           path: |
             dist/*.exe
-      # Si empujas una etiqueta como v1.1.0, se publica una Release con los .exe para descargar
-      - name: Publicar Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+            dist/latest.yml
+            dist/*.blockmap
+
+  android:
+    needs: probar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - uses: actions/setup-java@v4
         with:
-          files: dist/*.exe
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run android:sync
+      - name: Preparar firma de publicación
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "Faltan secretos de firma Android. Consulta docs/GITHUB.md antes de publicar una versión v*."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          echo "ANDROID_KEYSTORE_PATH=$GITHUB_WORKSPACE/android/app/release.keystore" >> "$GITHUB_ENV"
+      - name: Construir APK firmado
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          mkdir -p dist
+          cd android
+          ./gradlew assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "../dist/Mis-Inversiones-v${GITHUB_REF_NAME#v}.apk"
+      - name: Construir APK de prueba
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: cd android && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: |
+            dist/*.apk
+            android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: ignore
+
+  publicar:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-release'
+          merge-multiple: true
+          path: release-assets
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
           generate_release_notes: true
+
+
+

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mis Inversiones</string>
+    <string name="title_activity_main">Mis Inversiones</string>
+    <string name="package_name">com.misinversiones.app</string>
+    <string name="custom_url_scheme">com.misinversiones.app</string>
+</resources>
