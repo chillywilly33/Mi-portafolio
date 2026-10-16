@@ -1,0 +1,28 @@
+{
+  "name": "mis-inversiones",
+  "productName": "Mis Inversiones",
+  "version": "1.0.0",
+  "description": "Administrador personal de inversiones basado en mi guía de inversión",
+  "main": "main.js",
+  "author": "Mis Inversiones",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node tests/calc.test.js",
+    "dist": "electron-builder --win portable nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.misinversiones.app",
+    "productName": "Mis Inversiones",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "preload.js", "src/**/*", "package.json"],
+    "win": { "icon": "build/icon.ico", "target": ["portable", "nsis"] },
+    "portable": { "artifactName": "Mis-Inversiones-portable.exe" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "artifactName": "Mis-Inversiones-instalador.exe", "createDesktopShortcut": true }
+  }
+}
